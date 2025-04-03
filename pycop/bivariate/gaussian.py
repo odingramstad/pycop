@@ -71,20 +71,14 @@ class gaussian(copula):
         y1 = norm.ppf(u, 0, 1)
         y2 = norm.ppf(v, 0, 1)
 
-        pdf_y1 = norm.pdf(y1)
-        pdf_y2 = norm.pdf(y2)
-
-        dy1_du = 1/pdf_y1
-        dy2_dv = 1/pdf_y2
-
         rho = param[0]
 
         if deriv == 'u':
             yt = (y2 - rho*y1)/np.sqrt(1 - rho**2)
-            return dy1_du*norm.pdf(y1)*norm.cdf(yt)
         elif deriv == 'v':
             yt = (y1 - rho*y2)/np.sqrt(1 - rho**2)
-            return dy2_dv*norm.pdf(y2)*norm.cdf(yt)
+
+        return norm.cdf(yt)
 
     def get_pdf(self, u, v, param):
         """
