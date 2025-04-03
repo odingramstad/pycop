@@ -87,10 +87,12 @@ class archimedean(copula):
 
     def get_dcdf_duv(self, deriv, u, v, param):
         """
-        # Computes the CDF
+        # Computes the partial derivative of the CDF
 
         Parameters
         ----------
+        deriv : string
+            Which derivative to take: 'u' or 'v'.
         u, v : float
             Values of the marginal CDFs
         param : list
