@@ -19,7 +19,7 @@ class archimedean(copula):
     bounds_param : list
         A list that contains the domain of the parameter(s) in a tuple.
         Exemple : [(lower, upper)]
-    parameters_start : array 
+    parameters_start : array
         Value(s) of the initial guess when estimating the copula parameter(s).
         It represents the parameter `x0` in the `scipy.optimize.minimize` function.
 
@@ -38,7 +38,7 @@ class archimedean(copula):
     Archimedean_families = [
         'clayton', 'gumbel', 'frank', 'joe', 'galambos','fgm', 'plackett',
         'rgumbel', 'rclayton', 'rjoe','rgalambos', 'BB1', 'BB2']
-    
+
 
     def __init__(self, family):
         """
@@ -85,6 +85,105 @@ class archimedean(copula):
             print("family \"%s\" not in list: %s" % (family, archimedean.Archimedean_families) )
             raise ValueError
 
+    def get_dcdf_duv(self, deriv, u, v, param):
+        """
+        # Computes the CDF
+
+        Parameters
+        ----------
+        u, v : float
+            Values of the marginal CDFs
+        param : list
+            A list that contains the copula parameter(s) (float)
+        """
+
+        p0 = param[0]
+
+        if self.family == 'clayton':
+            if deriv == 'u':
+                return 1/(u*u**p0*(-1 + v**(-p0) + u**(-p0))*(-1 + v**(-p0) + u**(-p0))**(1/p0))
+            elif deriv == 'v':
+                return 1/(v*v**p0*(-1 + v**(-p0) + u**(-p0))*(-1 + v**(-p0) + u**(-p0))**(1/p0))
+
+            return (u ** (-param[0]) + v ** (-param[0]) - 1) ** (-1 / param[0])
+
+        elif self.family == 'rclayton':
+            return (1 - archimedean(family='clayton').get_dcdf_duv(deriv, (1 - u),(1 - v), param) )
+
+        elif self.family == 'gumbel':
+            logu, logv = np.log(u), np.log(v)
+            mlogup, mlogvp = (-logu)**p0, (-logv)**p0
+            if deriv == 'u':
+                return -mlogup*(mlogup + mlogvp)**(1/p0)*np.exp(-(mlogup + mlogvp)**(1/p0))/(u*(mlogup + mlogvp)*logu)
+            elif deriv == 'v':
+                return -mlogvp*(mlogup + mlogvp)**(1/p0)*np.exp(-(mlogup + mlogvp)**(1/p0))/(v*(mlogup + mlogvp)*logv)
+
+        elif self.family == 'rgumbel':
+            return (1 - archimedean(family='gumbel').get_dcdf_duv(deriv, (1 - u), (1 - v), param) )
+
+        elif self.family == 'frank':
+            expu, expv, expp = np.exp(-p0*u), np.exp(-p0*v), np.exp(-p0)
+            if deriv == 'u':
+                return (-1 + expv)*expu/((-1 + expp)*(1 + (-1 + expu)*(-1 + expv)/(-1 + expp)))
+            elif deriv == 'v':
+                return (-1 + expu)*expv/((-1 + expp)*(1 + (-1 + expu)*(-1 + expv)/(-1 + expp)))
+
+        elif self.family == 'joe':
+            u_ = (1 - u) ** p0
+            v_ = (1 - v) ** p0
+            if deriv == 'u':
+                return (1 - u)**(p0 - 1)*(1 - v_)*(-u_*v_ + u_ + v_)**((1 - p0)/p0)
+            elif deriv == 'v':
+                return (1 - v)**(p0 - 1)*(1 - u_)*(-u_*v_ + u_ + v_)**((1 - p0)/p0)
+
+        elif self.family == 'rjoe':
+            return (1 - archimedean(family='joe').get_dcdf_duv(deriv, (1 - u),(1 - v), param) )
+
+        elif self.family == 'galambos':
+            logu, logv = np.log(u), np.log(v)
+            mlogup, mlogvp = (-logu)**p0, (-logv)**p0
+            x_ = ((mlogup + mlogvp)/(mlogup*mlogvp))**(1/p0)
+            if deriv == 'u':
+                return v*(mlogvp + x_*(mlogup + mlogvp)*logu)*np.exp((x_)**(-1/p0))/(x_*(mlogup + mlogvp)*logu)
+            elif deriv == 'v':
+                return u*(mlogup + x_*(mlogup + mlogvp)*logv)*np.exp((x_)**(-1/p0))/(x_*(mlogup + mlogvp)*logv)
+
+        elif self.family == 'rgalambos':
+            return (1 - archimedean(family='galambos').get_dcdf_duv(deriv, (1 - u),(1 - v), param) )
+
+        elif self.family == 'fgm':
+            if deriv == 'u':
+                return v*(p0*u*(v - 1) + p0*(u - 1)*(v - 1) + 1)
+            elif deriv == 'v':
+                return u*(p0*v*(u - 1) + p0*(u - 1)*(v - 1) + 1)
+
+        elif self.family == 'plackett':
+            eta = p0 - 1
+            if deriv == 'u':
+                return (1.0*p0*v - 0.5*eta*(u + v) + 0.5*(-4*p0*u*v*eta + (eta*(u + v) + 1)**2)**0.5 - 0.5)/(-4*p0*u*v*eta + (eta*(u + v) + 1)**2)**0.5
+            elif deriv == 'v':
+                return (1.0*p0*u - 0.5*eta*(u + v) + 0.5*(-4*p0*u*v*eta + (eta*(u + v) + 1)**2)**0.5 - 0.5)/(-4*p0*u*v*eta + (eta*(u + v) + 1)**2)**0.5
+
+        elif self.family == 'BB1':
+            p1 = param[1]
+            t1 = (-(u**p1 - 1)/u**p1)**p0
+            t2 = (-(v**p1 - 1)/v**p1)**p0
+            if deriv == 'u':
+                return -t1/(u*(u**p1 - 1)*(t1 + t2 + 1)*((t1 + t2 + 1)**(1/p0))**(1/p1))
+            elif deriv == 'v':
+                return -t2/(v*(v**p1 - 1)*(t1 + t2 + 1)*((t1 + t2 + 1)**(1/p0))**(1/p1))
+
+        elif self.family == 'BB2':
+            expu, expv, expp, expm = np.exp(p0/u**p1), np.exp(p0/v**p1), np.exp(p0), np.exp(-p0)
+            expu1, expv1 = np.exp(p0*(u**p1 - 1)/u**p1), np.exp(p0*(v**p1 - 1)/v**p1)
+            p0log = (p0 + np.log((-expp + expu + expv)*expm))
+            exp0 = np.exp(p0*((v**p1 - 1)/v**p1 + (u**p1 - 1)/u**p1))
+
+            if deriv == 'u':
+                return p0*u**(-p1 - 1)*expv1/((p0log/p0)**(1/p1)*p0log*(-exp0 + expu1 + expv1))
+            elif deriv == 'v':
+                return p0*v**(-p1 - 1)*expu1/((p0log/p0)**(1/p1)*p0log*(-exp0 + expu1 + expv1))
+
     def get_cdf(self, u, v, param):
         """
         # Computes the CDF
@@ -92,7 +191,7 @@ class archimedean(copula):
         Parameters
         ----------
         u, v : float
-            Values of the marginal CDFs 
+            Values of the marginal CDFs
         param : list
             A list that contains the copula parameter(s) (float)
         """
@@ -148,7 +247,7 @@ class archimedean(copula):
             u_ = np.exp(param[0] * (u ** (-param[1]) - 1))
             v_ = np.exp(param[0] * (v ** (-param[1]) - 1))
             return (1 + (1 / param[0]) * np.log(u_ + v_ - 1)) ** (-1 / param[1])
-        
+
 
     def get_pdf(self, u, v, param):
         """
@@ -157,7 +256,7 @@ class archimedean(copula):
         Parameters
         ----------
         u, v : float
-            Values of the marginal CDFs 
+            Values of the marginal CDFs
         param : list
             A list that contains the copula parameter(s) (float)
         """
@@ -166,7 +265,7 @@ class archimedean(copula):
             term1 = (param[0] + 1) * (u * v) ** (-param[0] - 1)
             term2 = (u ** (-param[0]) + v ** (-param[0]) - 1) ** (-2 - 1 / param[0])
             return term1 * term2
-    
+
         if self.family == 'rclayton':
             return archimedean(family='clayton').get_pdf((1 - u),(1 - v), param)
 
@@ -218,7 +317,7 @@ class archimedean(copula):
         elif self.family == 'plackett':
             eta = (param[0] - 1)
             term1 = param[0] * (1 + eta * (u + v - 2 * u * v))
-            term2 = (1 + eta * (u + v)) ** 2 
+            term2 = (1 + eta * (u + v)) ** 2
             term3 = 4 * param[0] * eta * u * v
             return term1 / (term2 - term3) ** (3 / 2)
 
