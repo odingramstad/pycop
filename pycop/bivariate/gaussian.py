@@ -54,31 +54,26 @@ class gaussian(copula):
 
         return multivariate_normal.cdf(np.array([y1, y2]).T, mean=None, cov=[[1, rho], [rho, 1]])
 
-    def get_dcdf_duv(self, deriv, u, v, param):
+    def get_grad_cdf(self, u, v, param):
         """
-        # Computes the partial derivative of the CDF
+        # Computes the gradient of the CDF
 
         Parameters
         ----------
-        deriv : string
-             Which derivative to take: 'u' or 'v'.
         u, v : float
             Values of the marginal CDFs
         param : list
             The correlation coefficient param[0] ∈ [-1,1].
             Used to defined the correlation matrix (squared, symetric and definite positive)
         """
+
         y1 = norm.ppf(u, 0, 1)
         y2 = norm.ppf(v, 0, 1)
 
         rho = param[0]
 
-        if deriv == 'u':
-            yt = (y2 - rho*y1)/np.sqrt(1 - rho**2)
-        elif deriv == 'v':
-            yt = (y1 - rho*y2)/np.sqrt(1 - rho**2)
-
-        return norm.cdf(yt)
+        return (norm.cdf((y2 - rho*y1)/np.sqrt(1 - rho**2)),
+                norm.cdf((y1 - rho*y2)/np.sqrt(1 - rho**2)))
 
     def get_pdf(self, u, v, param):
         """
