@@ -85,14 +85,12 @@ class archimedean(copula):
             print("family \"%s\" not in list: %s" % (family, archimedean.Archimedean_families) )
             raise ValueError
 
-    def get_dcdf_duv(self, deriv, u, v, param):
+    def get_grad_cdf(self, u, v, param):
         """
-        # Computes the partial derivative of the CDF
+        # Computes the gradient of the CDF with respect to u and v
 
         Parameters
         ----------
-        deriv : string
-            Which derivative to take: 'u' or 'v'.
         u, v : float
             Values of the marginal CDFs
         param : list
@@ -102,90 +100,91 @@ class archimedean(copula):
         p0 = param[0]
 
         if self.family == 'clayton':
-            if deriv == 'u':
-                return 1/(u*u**p0*(-1 + v**(-p0) + u**(-p0))*(-1 + v**(-p0) + u**(-p0))**(1/p0))
-            elif deriv == 'v':
-                return 1/(v*v**p0*(-1 + v**(-p0) + u**(-p0))*(-1 + v**(-p0) + u**(-p0))**(1/p0))
-
-            return (u ** (-param[0]) + v ** (-param[0]) - 1) ** (-1 / param[0])
+            return (1/(u*u**p0*(-1 + v**(-p0) + u**(-p0))*(-1 + v**(-p0) + u**(-p0))**(1/p0)),
+                    1/(v*v**p0*(-1 + v**(-p0) + u**(-p0))*(-1 + v**(-p0) + u**(-p0))**(1/p0)))
 
         elif self.family == 'rclayton':
-            return (1 - archimedean(family='clayton').get_dcdf_duv(deriv, (1 - u),(1 - v), param) )
+            return tuple(1 - x for x in archimedean(family='clayton').get_grad_cdf((1 - u),(1 - v), param))
 
         elif self.family == 'gumbel':
             logu, logv = np.log(u), np.log(v)
             mlogup, mlogvp = (-logu)**p0, (-logv)**p0
-            if deriv == 'u':
-                return -mlogup*(mlogup + mlogvp)**(1/p0)*np.exp(-(mlogup + mlogvp)**(1/p0))/(u*(mlogup + mlogvp)*logu)
-            elif deriv == 'v':
-                return -mlogvp*(mlogup + mlogvp)**(1/p0)*np.exp(-(mlogup + mlogvp)**(1/p0))/(v*(mlogup + mlogvp)*logv)
+            mlupv = (mlogup + mlogvp)
+            t1 = mlupv**(1/p0)*np.exp(-mlupv**(1/p0))
+            return (-mlogup*t1/(u*mlupv*logu)
+                    -mlogvp*t1/(v*mlupv*logv))
 
         elif self.family == 'rgumbel':
-            return (1 - archimedean(family='gumbel').get_dcdf_duv(deriv, (1 - u), (1 - v), param) )
+            return tuple(1 - x for x in archimedean(family='gumbel').get_grad_cdf((1 - u),(1 - v), param))
 
         elif self.family == 'frank':
             expu, expv, expp = np.exp(-p0*u), np.exp(-p0*v), np.exp(-p0)
-            if deriv == 'u':
-                return (-1 + expv)*expu/((-1 + expp)*(1 + (-1 + expu)*(-1 + expv)/(-1 + expp)))
-            elif deriv == 'v':
-                return (-1 + expu)*expv/((-1 + expp)*(1 + (-1 + expu)*(-1 + expv)/(-1 + expp)))
+            t1 = ((-1 + expp)*(1 + (-1 + expu)*(-1 + expv)/(-1 + expp)))
+            return ((-1 + expv)*expu/t1
+                    (-1 + expu)*expv/t1)
 
         elif self.family == 'joe':
             u_ = (1 - u) ** p0
             v_ = (1 - v) ** p0
-            if deriv == 'u':
-                return (1 - u)**(p0 - 1)*(1 - v_)*(-u_*v_ + u_ + v_)**((1 - p0)/p0)
-            elif deriv == 'v':
-                return (1 - v)**(p0 - 1)*(1 - u_)*(-u_*v_ + u_ + v_)**((1 - p0)/p0)
+            t1 = (-u_*v_ + u_ + v_)**((1 - p0)/p0)
+            return ((1 - u)**(p0 - 1)*(1 - v_)*t1
+                    (1 - v)**(p0 - 1)*(1 - u_)*t1)
 
         elif self.family == 'rjoe':
-            return (1 - archimedean(family='joe').get_dcdf_duv(deriv, (1 - u),(1 - v), param) )
+            return tuple(1 - x for x in archimedean(family='joe').get_grad_cdf((1 - u),(1 - v), param))
 
         elif self.family == 'galambos':
             logu, logv = np.log(u), np.log(v)
             mlogup, mlogvp = (-logu)**p0, (-logv)**p0
-            x_ = ((mlogup + mlogvp)/(mlogup*mlogvp))**(1/p0)
-            if deriv == 'u':
-                return v*(mlogvp + x_*(mlogup + mlogvp)*logu)*np.exp((x_)**(-1/p0))/(x_*(mlogup + mlogvp)*logu)
-            elif deriv == 'v':
-                return u*(mlogup + x_*(mlogup + mlogvp)*logv)*np.exp((x_)**(-1/p0))/(x_*(mlogup + mlogvp)*logv)
+            mlupv = (mlogup + mlogvp)
+            x_ = (mlupv/(mlogup*mlogvp))**(1/p0)
+            t1 = np.exp((x_)**(-1/p0))
+
+            return (v*(mlogvp + x_*mlupv*logu)*t1/(x_*mlupv*logu),
+                    u*(mlogup + x_*mlupv*logv)*t1/(x_*mlupv*logv))
 
         elif self.family == 'rgalambos':
-            return (1 - archimedean(family='galambos').get_dcdf_duv(deriv, (1 - u),(1 - v), param) )
+            return tuple(1 - x for x in archimedean(family='galambos').get_grad_cdf((1 - u),(1 - v), param))
 
         elif self.family == 'fgm':
-            if deriv == 'u':
-                return v*(p0*u*(v - 1) + p0*(u - 1)*(v - 1) + 1)
-            elif deriv == 'v':
-                return u*(p0*v*(u - 1) + p0*(u - 1)*(v - 1) + 1)
+            um1, vm1 = (u - 1), (v - 1)
+
+            return (v*(p0*u*vm1 + p0*um1*vm1 + 1),
+                    u*(p0*v*um1 + p0*um1*vm1 + 1))
 
         elif self.family == 'plackett':
             eta = p0 - 1
-            if deriv == 'u':
-                return (1.0*p0*v - 0.5*eta*(u + v) + 0.5*(-4*p0*u*v*eta + (eta*(u + v) + 1)**2)**0.5 - 0.5)/(-4*p0*u*v*eta + (eta*(u + v) + 1)**2)**0.5
-            elif deriv == 'v':
-                return (1.0*p0*u - 0.5*eta*(u + v) + 0.5*(-4*p0*u*v*eta + (eta*(u + v) + 1)**2)**0.5 - 0.5)/(-4*p0*u*v*eta + (eta*(u + v) + 1)**2)**0.5
+            upv = (u + v)
+            t1 = (-4*p0*u*v*eta + (eta*upv + 1)**2)**0.5
+
+            return ((1.0*p0*v - 0.5*eta*upv + 0.5*t1 - 0.5)/t1,
+                    (1.0*p0*u - 0.5*eta*upv + 0.5*t1 - 0.5)/t1)
 
         elif self.family == 'BB1':
             p1 = param[1]
-            t1 = (-(u**p1 - 1)/u**p1)**p0
-            t2 = (-(v**p1 - 1)/v**p1)**p0
-            if deriv == 'u':
-                return -t1/(u*(u**p1 - 1)*(t1 + t2 + 1)*((t1 + t2 + 1)**(1/p0))**(1/p1))
-            elif deriv == 'v':
-                return -t2/(v*(v**p1 - 1)*(t1 + t2 + 1)*((t1 + t2 + 1)**(1/p0))**(1/p1))
+            up1 = u**p1
+            vp1 = v**p1
+            c1 = (up1 - 1)
+            c2 = (vp1 - 1)
+            t1 = (-c1/up1)**p0
+            t2 = (-c2/vp1)**p0
+            s1 = (t1 + t2 + 1)
+            s2 = s1*(s1**(1/p0))**(1/p1)
+            return (-t1/(u*c1*s2), -t2/(v*c2*s2))
 
         elif self.family == 'BB2':
             p1 = param[1]
-            expu, expv, expp, expm = np.exp(p0/u**p1), np.exp(p0/v**p1), np.exp(p0), np.exp(-p0)
-            expu1, expv1 = np.exp(p0*(u**p1 - 1)/u**p1), np.exp(p0*(v**p1 - 1)/v**p1)
+            up1 = u**p1
+            vp1 = v**p1
+            expu, expv, expp, expm = np.exp(p0/up1), np.exp(p0/vp1), np.exp(p0), np.exp(-p0)
+            expu1, expv1 = np.exp(p0*(up1 - 1)/up1), np.exp(p0*(vp1 - 1)/vp1)
             p0log = (p0 + np.log((-expp + expu + expv)*expm))
-            exp0 = np.exp(p0*((v**p1 - 1)/v**p1 + (u**p1 - 1)/u**p1))
+            exp0 = np.exp(p0*((vp1 - 1)/vp1 + (up1 - 1)/up1))
 
-            if deriv == 'u':
-                return p0*u**(-p1 - 1)*expv1/((p0log/p0)**(1/p1)*p0log*(-exp0 + expu1 + expv1))
-            elif deriv == 'v':
-                return p0*v**(-p1 - 1)*expu1/((p0log/p0)**(1/p1)*p0log*(-exp0 + expu1 + expv1))
+            t1 = ((p0log/p0)**(1/p1)*p0log*(-exp0 + expu1 + expv1))
+
+            return (p0*u**(-p1 - 1)*expv1/t1,
+                    p0*v**(-p1 - 1)*expu1/t1)
 
     def get_cdf(self, u, v, param):
         """
