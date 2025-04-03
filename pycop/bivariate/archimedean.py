@@ -174,6 +174,7 @@ class archimedean(copula):
                 return -t2/(v*(v**p1 - 1)*(t1 + t2 + 1)*((t1 + t2 + 1)**(1/p0))**(1/p1))
 
         elif self.family == 'BB2':
+            p1 = param[1]
             expu, expv, expp, expm = np.exp(p0/u**p1), np.exp(p0/v**p1), np.exp(p0), np.exp(-p0)
             expu1, expv1 = np.exp(p0*(u**p1 - 1)/u**p1), np.exp(p0*(v**p1 - 1)/v**p1)
             p0log = (p0 + np.log((-expp + expu + expv)*expm))
