@@ -100,8 +100,9 @@ class archimedean(copula):
         p0 = param[0]
 
         if self.family == 'clayton':
-            return (1/(u*u**p0*(-1 + v**(-p0) + u**(-p0))*(-1 + v**(-p0) + u**(-p0))**(1/p0)),
-                    1/(v*v**p0*(-1 + v**(-p0) + u**(-p0))*(-1 + v**(-p0) + u**(-p0))**(1/p0)))
+            t1 = (-1 + v**(-p0) + u**(-p0))
+            return (1/(u*u**p0*t1*t1**(1/p0)),
+                    1/(v*v**p0*t1*t1**(1/p0)))
 
         elif self.family == 'rclayton':
             return tuple(1 - x for x in archimedean(family='clayton').get_grad_cdf((1 - u),(1 - v), param))
