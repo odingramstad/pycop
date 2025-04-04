@@ -32,8 +32,8 @@ class gaussian(copula):
         # the `gaussian` copula class inherit the `copula` class
         super().__init__()
         self.family = "gaussian"
-        self.bounds_param = [(-1, 1)]
-        self.parameters_start = np.array(0)
+        self.bounds_param = [(-1.0, 1.0)]
+        self.parameters_start = np.array(0.0)
 
     def get_cdf(self, u, v, param):
         """

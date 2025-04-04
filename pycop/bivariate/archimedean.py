@@ -63,24 +63,24 @@ class archimedean(copula):
             self.parameters_start = np.array(0.5)
 
         elif family in ['gumbel', 'joe', 'rgumbel', 'rjoe'] :
-            self.bounds_param = [(1, None)]
+            self.bounds_param = [(1.0, None)]
             self.parameters_start = np.array(1.5)
 
         elif family == 'frank':
             self.bounds_param = [(None, None)]
-            self.parameters_start = np.array(2)
+            self.parameters_start = np.array(2.0)
 
         elif family == 'fgm':
-            self.bounds_param = [(-1, 1-1e-6)]
-            self.parameters_start = np.array(0)
+            self.bounds_param = [(-1.0, 1.0 - 1e-6)]
+            self.parameters_start = np.array(0.0)
 
         elif family  in ['BB1'] :
-            self.bounds_param = [(1e-6, None), (1, None)]
-            self.parameters_start = (np.array(.5), np.array(1.5))
+            self.bounds_param = [(1e-6, None), (1.0, None)]
+            self.parameters_start = (np.array(0.5), np.array(1.5))
 
         elif family  in ['BB2'] :
             self.bounds_param = [(1e-6, None), (1e-6, None)]
-            self.parameters_start = (np.array(1), np.array(1))
+            self.parameters_start = (np.array(1.0), np.array(1.0))
         else:
             print("family \"%s\" not in list: %s" % (family, archimedean.Archimedean_families) )
             raise ValueError
