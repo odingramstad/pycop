@@ -273,6 +273,26 @@ class archimedean(copula):
             return archimedean(family='clayton').get_pdf((1 - u),(1 - v), param)
 
         elif self.family == 'gumbel':
+            U = -np.log(u)
+            V = -np.log(v)
+            p0 = param[0]
+            Up = U**p0
+            Vp = V**p0
+
+            Upm = U**(p0 - 1)
+            Vpm = V**(p0 - 1)
+
+            cdf = archimedean(family='gumbel').get_cdf(u,v, param)
+            cdf = np.exp(-(Up + Vp)**(1/p0))
+
+            pp = Upm*Vpm*(Up + Vp)**(-2 + 1/p0)*(p0 + (Up + Vp)**(1/p0) - 1)*cdf/(u*v)
+
+            logpp = np.log(Upm) + np.log(Vpm) + (-2 + 1/p0)*np.log(Up + Vp) + np.log(p0 + (Up + Vp)**(1/p0) - 1) - (Up + Vp)**(1/p0) - np.log(u) - np.log(v)
+
+            print()
+
+
+
             term1 = np.power(np.multiply(u, v), -1)
             tmp = np.power(-np.log(u), param[0]) + np.power(-np.log(v), param[0])
             term2 = np.power(tmp, -2 + 2.0 / param[0])
