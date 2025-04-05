@@ -199,6 +199,13 @@ class archimedean(copula):
             A list that contains the copula parameter(s) (float)
         """
 
+        if u == 0 or v == 0:
+            return 0.0
+
+        if u == 1 and v == 1:
+            return 1.0
+
+
         if self.family == 'clayton':
             return (u ** (-param[0]) + v ** (-param[0]) - 1) ** (-1 / param[0])
 
@@ -233,6 +240,9 @@ class archimedean(copula):
             return u * v * (1 + param[0] * (1 - u) * (1 - v))
 
         elif self.family == 'plackett':
+            if np.isclose(param[0], 1.0):
+                return u*v
+
             eta = param[0] - 1
             term1 = 0.5 * eta ** -1
             term2 = 1 + eta * (u + v)
@@ -252,7 +262,7 @@ class archimedean(copula):
             return (1 + (1 / param[0]) * np.log(u_ + v_ - 1)) ** (-1 / param[1])
 
 
-    def get_pdf(self, u, v, param):
+    def get_pdf(self, ui, vi, param):
         """
         # Computes the PDF
 
@@ -264,7 +274,15 @@ class archimedean(copula):
             A list that contains the copula parameter(s) (float)
         """
 
+        u = ui
+        v = vi
+
         if self.family == 'clayton':
+            if ui == 0:
+                u = 1e-16
+            if vi == 0:
+                v = 1e-16
+
             term1 = (param[0] + 1) * (u * v) ** (-param[0] - 1)
             term2 = (u ** (-param[0]) + v ** (-param[0]) - 1) ** (-2 - 1 / param[0])
             return term1 * term2
@@ -273,25 +291,14 @@ class archimedean(copula):
             return archimedean(family='clayton').get_pdf((1 - u),(1 - v), param)
 
         elif self.family == 'gumbel':
-            U = -np.log(u)
-            V = -np.log(v)
-            p0 = param[0]
-            Up = U**p0
-            Vp = V**p0
+            if ui == 0:
+                u = 1e-16
+            if vi == 0:
+                v = 1e-16
 
-            Upm = U**(p0 - 1)
-            Vpm = V**(p0 - 1)
-
-            cdf = archimedean(family='gumbel').get_cdf(u,v, param)
-            cdf = np.exp(-(Up + Vp)**(1/p0))
-
-            pp = Upm*Vpm*(Up + Vp)**(-2 + 1/p0)*(p0 + (Up + Vp)**(1/p0) - 1)*cdf/(u*v)
-
-            logpp = np.log(Upm) + np.log(Vpm) + (-2 + 1/p0)*np.log(Up + Vp) + np.log(p0 + (Up + Vp)**(1/p0) - 1) - (Up + Vp)**(1/p0) - np.log(u) - np.log(v)
-
-            print()
-
-
+            if ui == 1 and vi == 1:
+                u = 1 - 1e-16
+                v = 1 - 1e-16
 
             term1 = np.power(np.multiply(u, v), -1)
             tmp = np.power(-np.log(u), param[0]) + np.power(-np.log(v), param[0])
@@ -310,6 +317,9 @@ class archimedean(copula):
             return term1 / term2
 
         elif self.family == 'joe':
+            if ui == 1 and vi == 1:
+                u = 1 - 1e-16
+                v = 1 - 1e-16
             u_ = (1 - u) ** param[0]
             v_ = (1 - v) ** param[0]
             term1 = (u_ + v_ - u_ * v_) ** (-2 + 1 / param[0])
@@ -321,6 +331,15 @@ class archimedean(copula):
             return archimedean(family='joe').get_pdf((1 - u),(1 - v), param)
 
         elif self.family == 'galambos':
+            if ui == 0:
+                u = 1e-16
+            if vi == 0:
+                v = 1e-16
+            if ui == 1:
+                u = 1 - 1e-16
+            if vi == 1:
+                v = 1 - 1e-16
+
             x = -np.log(u)
             y = -np.log(v)
             term1 = self.get_cdf(u, v, param) / (v * u)
@@ -345,6 +364,8 @@ class archimedean(copula):
             return term1 / (term2 - term3) ** (3 / 2)
 
         elif self.family == 'BB1':
+            u = max(min(1 - 1e-6, ui), 1e-6)
+            v = max(min(1 - 1e-6, vi), 1e-6)
             theta, delta = param[0], param[1]
             x = (u ** (-theta) - 1) ** (delta)
             y = (v ** (-theta) - 1) ** (delta)
@@ -355,14 +376,41 @@ class archimedean(copula):
             return term1 * term2 * term3 * term4
 
         elif self.family == 'BB2':
-            theta, delta = param[0], param[1]
-            x = np.exp(delta * (u ** (-theta) )) - 1
-            y = np.exp(delta * (v ** (-theta) )) - 1
-            term1 = (1 + (delta ** (-1)) * np.log(x + y - 1)) ** (-2 -1 / theta)
-            term2 = (x + y - 1) ** (-2)
-            term3 = 1 + theta + theta * delta + theta * np.log(x + y - 1)
-            term4 = x * y * (u * v) ** (-theta - 1)
-            return term1 * term2 * term3 * term4
+            if ui == 0 and vi == 0:
+                u = 1e-6
+                v = 1e-6
+            # u = max(min(1 - 1e-16, ui), 1e-6)
+            # v = max(min(1 - 1e-16, vi), 1e-6)
+
+            p0, p1 = param
+
+            exp0 = np.exp(p0)
+            exp0m = np.exp(-p0)
+            up1 = u**p1
+            vp1 = v**p1
+            exp0u = np.exp(p0/up1)
+            exp0v = np.exp(p0/vp1)
+            if np.isinf(exp0u) or np.isinf(exp0v):
+                log1 = np.logaddexp(p0/up1, p0/vp1) - p0
+            else:
+                log1 = np.log(-exp0 + exp0u + exp0v) - p0
+            exp1 = np.exp(p0*(up1*(vp1 - 1) + vp1*(up1 - 1))/(up1*vp1))
+            exp2 = np.exp(p0*((vp1 - 1)/vp1 + (up1 - 1)/up1))
+            exp3 = np.exp(p0*(up1 - 1)/up1)
+            exp4 = np.exp(p0*(vp1 - 1)/vp1)
+            p0log1 = (p0 + log1)
+
+            return p0**2*u**(-p1 - 1)*v**(-p1 - 1)*(p1*p0log1 + p1 + 1)*exp1/((p0log1/p0)**(1/p1)*p0log1**2*(-exp2 + exp3 + exp4)**2)
+
+            # theta, delta = param[0], param[1]
+            # x = np.exp(delta * (u ** (-theta) )) - 1
+            # y = np.exp(delta * (v ** (-theta) )) - 1
+            # term1 = (1 + (delta ** (-1.0)) * np.log(x + y - 1)) ** (-2 -1 / theta)
+            # term2 = (x + y - 1) ** (-2.0)
+            # term3 = 1 + theta + theta * delta + theta * np.log(x + y - 1)
+            # term4 = x * y * (u * v) ** (-theta - 1)
+            # pdf = term1 * term2 * term3 * term4
+            # return term1 * term2 * term3 * term4
 
     def LTDC(self, theta):
         """
