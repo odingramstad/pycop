@@ -1,11 +1,11 @@
 import numpy as np
 import scipy.special as scsp
 from pycop.bivariate.copula import copula
-import jax.numpy as jnp
-import jax.scipy.special as jscsp
-from jax import grad
-from jax import config
-config.update("jax_enable_x64", True)
+# import jax.numpy as jnp
+# import jax.scipy.special as jscsp
+# from jax import grad
+# from jax import config
+# config.update("jax_enable_x64", True)
 
 # Clayton Copula
 def clayton_copula(u, v, theta):
@@ -58,12 +58,6 @@ def bb2_copula(u, v, theta, delta):
     x = theta*(u**(-delta) - 1)
     y = theta*(v**(-delta) - 1)
     logt = scsp.logsumexp(np.array([x, y, 0.0]), 0, np.array([1.0, 1.0, -1.0]))
-    return (1 + (1/theta)*logt)**(-1/delta)
-
-def bb2_copula_jax(u, v, theta, delta):
-    x = theta*(u**(-delta) - 1)
-    y = theta*(v**(-delta) - 1)
-    logt = jscsp.logsumexp(jnp.array([x, y, 0.0]), 0, jnp.array([1.0, 1.0, -1.0]))
     return (1 + (1/theta)*logt)**(-1/delta)
 
 class archimedean(copula):
@@ -177,7 +171,7 @@ class archimedean(copula):
             mlogup, mlogvp = (-logu)**p0, (-logv)**p0
             mlupv = (mlogup + mlogvp)
             t1 = mlupv**(1/p0)*np.exp(-mlupv**(1/p0))
-            return (-mlogup*t1/(u*mlupv*logu)
+            return (-mlogup*t1/(u*mlupv*logu),
                     -mlogvp*t1/(v*mlupv*logv))
 
         elif self.family == 'rgumbel':
@@ -186,14 +180,14 @@ class archimedean(copula):
         elif self.family == 'frank':
             expu, expv, expp = np.exp(-p0*u), np.exp(-p0*v), np.exp(-p0)
             t1 = ((-1 + expp)*(1 + (-1 + expu)*(-1 + expv)/(-1 + expp)))
-            return ((-1 + expv)*expu/t1
+            return ((-1 + expv)*expu/t1,
                     (-1 + expu)*expv/t1)
 
         elif self.family == 'joe':
             u_ = (1 - u) ** p0
             v_ = (1 - v) ** p0
             t1 = (-u_*v_ + u_ + v_)**((1 - p0)/p0)
-            return ((1 - u)**(p0 - 1)*(1 - v_)*t1
+            return ((1 - u)**(p0 - 1)*(1 - v_)*t1,
                     (1 - v)**(p0 - 1)*(1 - u_)*t1)
 
         elif self.family == 'rjoe':
@@ -206,8 +200,8 @@ class archimedean(copula):
             x_ = (mlupv/(mlogup*mlogvp))**(1/p0)
             t1 = np.exp((x_)**(-1/p0))
 
-            return (v*(mlogvp + x_*mlupv*logu)*t1/(x_*mlupv*logu),
-                    u*(mlogup + x_*mlupv*logv)*t1/(x_*mlupv*logv))
+            return (v*(mlogvp/(x_*mlupv*logu) + 1)*t1,
+                    u*(mlogup/(x_*mlupv*logv) + 1)*t1)
 
         elif self.family == 'rgalambos':
             return tuple(1 - x for x in archimedean(family='galambos').get_grad_cdf((1 - u),(1 - v), param))
@@ -228,29 +222,42 @@ class archimedean(copula):
 
         elif self.family == 'BB1':
             p1 = param[1]
-            up1 = u**p1
-            vp1 = v**p1
-            c1 = (up1 - 1)
-            c2 = (vp1 - 1)
-            t1 = (-c1/up1)**p0
-            t2 = (-c2/vp1)**p0
-            s1 = (t1 + t2 + 1)
-            s2 = s1*(s1**(1/p0))**(1/p1)
-            return (-t1/(u*c1*s2), -t2/(v*c2*s2))
+
+            U = -1 + u**(-p1)
+            V = -1 + v**(-p1)
+            Up = -1 + u**p1
+            Vp = -1 + v**p1
+
+            x = U**p0 + V**p0 + 1
+
+            A = x**(1/(p0*p1))
+            Bu = Up*u*x
+            Bv = Vp*v*x
+
+            cdf_u = -(1/A)*(1/Bu)*(U**p0)
+            cdf_v = -(1/A)*(1/Bv)*(V**p0)
+
+            return cdf_u, cdf_v
+
 
         elif self.family == 'BB2':
             p1 = param[1]
-            up1 = u**p1
-            vp1 = v**p1
-            expu, expv, expp, expm = np.exp(p0/up1), np.exp(p0/vp1), np.exp(p0), np.exp(-p0)
-            expu1, expv1 = np.exp(p0*(up1 - 1)/up1), np.exp(p0*(vp1 - 1)/vp1)
-            p0log = (p0 + np.log((-expp + expu + expv)*expm))
-            exp0 = np.exp(p0*((vp1 - 1)/vp1 + (up1 - 1)/up1))
 
-            t1 = ((p0log/p0)**(1/p1)*p0log*(-exp0 + expu1 + expv1))
+            x = p0/u**p1
+            y = p0/v**p1
 
-            return (p0*u**(-p1 - 1)*expv1/t1,
-                    p0*v**(-p1 - 1)*expu1/t1)
+            exp_ymx = np.exp(y - x)
+            exp_xmy = np.exp(x - y)
+            exp_pmx = np.exp(p0 - x)
+            exp_pmy = np.exp(p0 - y)
+            logs = scsp.logsumexp([x, y, p0], 0, [1, 1, -1])
+
+            A = logs*(logs/p0)**(1/p1)
+
+            cdf_u = p0*u**(-p1 - 1)/(A + exp_ymx*A - A*exp_pmx)
+            cdf_v = p0*v**(-p1 - 1)/(A + exp_xmy*A - A*exp_pmy)
+
+            return cdf_u, cdf_v
 
     def get_cdf(self, u, v, param):
         """
@@ -386,16 +393,20 @@ class archimedean(copula):
             return term1 / (term2 - term3) ** (3 / 2)
 
         elif self.family == 'BB1':
-            theta, delta = param[0], param[1]
-            x = (u ** (-theta) - 1) ** (delta)
-            y = (v ** (-theta) - 1) ** (delta)
-            term1 = (1 + (x + y) ** (1 / delta)) ** (-1 / theta - 2)
-            term2 = (x + y) ** (1 / delta - 2)
-            term3 = theta * (delta - 1) + (theta * delta + 1) * (x + y) ** (1 / delta)
-            term4 = (x * y) ** (1 - 1 / delta) * (u * v) ** (-theta - 1)
-            pdf = term1 * term2 * term3 * term4
-            if not np.isfinite(pdf):
-                pdf = grad(grad(bb1_copula, argnums=0), argnums=1)(u, v, theta, delta)
+            p0, p1 = param[0], param[1]
+
+            U = -1 + u**(-p1)
+            V = -1 + v**(-p1)
+            Up = -1 + u**p1
+            Vp = -1 + v**p1
+            x = U**p0 + V**p0 + 1
+
+            A = x**(1/(p0*p1))
+            Bu = Up*u*x
+            Bv = Vp*v*x
+
+            pdf = (U**p0)*(V**p0)*(p0*p1 + 1)*(1/A)*(1/Bu)*(1/Bv)
+
             return pdf
 
         elif self.family == 'BB2':
@@ -404,16 +415,17 @@ class archimedean(copula):
             x = p0/u**p1
             y = p0/v**p1
 
-            logt = scsp.logsumexp([p0, x, y], 0, [-1, 1, 1]) - p0  #  log(-exp(p0) + exp(x) + exp(y)) - p0
+            logs = scsp.logsumexp([x, y, p0], 0, [1, 1, -1])
 
-            expp = np.exp(p0)
-            expx = np.exp(-x)
-            expy = np.exp(-y)
+            sxy = np.exp(p0 - 0.5*x - 0.5*y)
+            s_xdy = np.exp(0.5*x - 0.5*y)
+            s_ydx = np.exp(0.5*y - 0.5*x)
 
-            pdf = p0**2*u**(-p1 - 1)*v**(-p1 - 1)*(p1*(p0 + logt) + p1 + 1)*(expx*expy)/(((p0 + logt)/p0)**(1/p1)*(p0 + logt)**2*(-(expp*expx*expy) + (expx) + (expy))**2)
+            D = (sxy - s_xdy - s_ydx)**2
 
-            if not np.isfinite(pdf):
-                pdf = grad(grad(bb2_copula_jax, argnums=0), argnums=1)(u, v, p0, p1)
+            A = logs*(logs/p0)**(1/p1)
+
+            pdf = p0**2*u**(-p1 - 1)*v**(-p1 - 1)*(logs*p1 + p1 + 1)/(logs**2*(logs/p0)**(1/p1)*D)
 
             return pdf
 
