@@ -1,5 +1,70 @@
 import numpy as np
+import scipy.special as scsp
 from pycop.bivariate.copula import copula
+import jax.numpy as jnp
+import jax.scipy.special as jscsp
+from jax import grad
+from jax import config
+config.update("jax_enable_x64", True)
+
+# Clayton Copula
+def clayton_copula(u, v, theta):
+    return (u**(-theta) + v**(-theta) - 1)**(-1/theta)
+
+# Gumbel Copula
+def gumbel_copula(u, v, theta):
+    return np.exp(-((-np.log(u))**theta + (-np.log(v))**theta)**(1/theta))
+
+# Frank Copula
+def frank_copula(u, v, theta):
+    num = (np.exp(-theta * u) - 1) * (np.exp(-theta * v) - 1)
+    denom = np.exp(-theta) - 1
+    return -np.log(1 + num / denom) / theta
+
+# Joe Copula
+def joe_copula(u, v, theta):
+    x = (1 - u)**theta
+    y = (1 - v)**theta
+    return 1 - (x + y - x*y)**(1/theta)
+
+# Galambos Copula
+def galambos_copula(u, v, theta):
+    return np.exp(-(((-np.log(u))**(-theta) + (-np.log(v))**(-theta))**(-1/theta)))
+
+# FGM Copula
+def fgm_copula(u, v, theta):
+    return u * v * (1 + theta * (1 - u) * (1 - v))
+
+# Plackett Copula
+def plackett_copula(u, v, theta):
+    eta = theta - 1
+
+    if np.isclose(theta, 1.0):  # use Taylor-expansion for theta close to one
+        return u*v + eta*u*v*(1 - u)*(1 - v)
+
+    eta = theta - 1
+    upv = u + v
+    num = 1 + eta * upv - np.sqrt((1 + eta * upv)**2 - 4 * u * v * theta * eta)
+    denom = 2 * eta
+
+    return num / denom
+
+# BB1 Copula
+def bb1_copula(u, v, theta, delta):
+    return (1 + ((u**(-theta) - 1)**delta + (v**(-theta) - 1)**delta)**(1/delta))**(-1/theta)
+
+# BB2 Copula
+def bb2_copula(u, v, theta, delta):
+    x = theta*(u**(-delta) - 1)
+    y = theta*(v**(-delta) - 1)
+    logt = scsp.logsumexp(np.array([x, y, 0.0]), 0, np.array([1.0, 1.0, -1.0]))
+    return (1 + (1/theta)*logt)**(-1/delta)
+
+def bb2_copula_jax(u, v, theta, delta):
+    x = theta*(u**(-delta) - 1)
+    y = theta*(v**(-delta) - 1)
+    logt = jscsp.logsumexp(jnp.array([x, y, 0.0]), 0, jnp.array([1.0, 1.0, -1.0]))
+    return (1 + (1/theta)*logt)**(-1/delta)
 
 class archimedean(copula):
     """
@@ -199,58 +264,54 @@ class archimedean(copula):
             A list that contains the copula parameter(s) (float)
         """
 
+        if u == 0.0 or v == 0.0:
+            return 0.0
+
+        if u == 1.0 and v == 1.0:
+            return 1.0
+
+        theta = param[0]
+
         if self.family == 'clayton':
-            return (u ** (-param[0]) + v ** (-param[0]) - 1) ** (-1 / param[0])
+            return clayton_copula(u, v, theta)
 
         elif self.family == 'rclayton':
-            return (u + v - 1 + archimedean(family='clayton').get_cdf((1 - u),(1 - v), param) )
+            return u + v - 1 + archimedean(family='clayton').get_cdf(1 - u, 1 - v, param)
 
         elif self.family == 'gumbel':
-            return np.exp(-((-np.log(u)) ** param[0] + (-np.log(v)) ** param[0] ) ** (1 / param[0]))
+            return gumbel_copula(u, v, theta)
 
         elif self.family == 'rgumbel':
-            return (u + v - 1 + archimedean(family='gumbel').get_cdf((1-u),(1-v), param) )
+            return u + v - 1 + archimedean(family='gumbel').get_cdf(1 - u, 1 - v, param)
 
         elif self.family == 'frank':
-            a = (np.exp(-param[0] * u) - 1) * (np.exp(-param[0] * v) - 1)
-            return (-1 / param[0]) * np.log(1 + a / (np.exp(-param[0]) - 1))
+            return frank_copula(u, v, theta)
 
         elif self.family == 'joe':
-            u_ = (1 - u) ** param[0]
-            v_ = (1 - v) ** param[0]
-            return 1 - (u_ + v_ - u_ * v_) ** (1 / param[0])
+            return joe_copula(u, v, theta)
 
         elif self.family == 'rjoe':
-            return (u + v - 1 + archimedean(family='joe').get_cdf((1 - u),(1 - v), param) )
+            return u + v - 1 + archimedean(family='joe').get_cdf(1 - u, 1 - v, param)
 
         elif self.family == 'galambos':
-            return u * v * np.exp(((-np.log(u)) ** (-param[0]) + (-np.log(v)) ** (-param[0])) ** (-1 / param[0]) )
+            return galambos_copula(u, v, theta)
 
         elif self.family == 'rgalambos':
-            return (u + v - 1 + archimedean(family='galambos').get_cdf((1 - u),(1 - v), param) )
+            return u + v - 1 + archimedean(family='galambos').get_cdf(1 - u, 1 - v, param)
 
         elif self.family == 'fgm':
-            return u * v * (1 + param[0] * (1 - u) * (1 - v))
+            return fgm_copula(u, v, theta)
 
         elif self.family == 'plackett':
-            eta = param[0] - 1
-            term1 = 0.5 * eta ** -1
-            term2 = 1 + eta * (u + v)
-            term3 = (1 + eta * (u + v)) ** 2
-            term4 = 4 * param[0] * eta * u * v
-            return term1 * (term2 - (term3 - term4) ** 0.5)
+            return plackett_copula(u, v, theta)
 
         elif self.family == 'BB1':
-            term1 = (u ** (-param[1]) - 1) ** param[0]
-            term2 = (v ** (-param[1]) - 1) ** param[0]
-            term3 = (1 + term1 + term2) ** (1 / param[0])
-            return (term3) ** (-1 / param[1])
+            delta = param[1]
+            return bb1_copula(u, v, theta, delta)
 
         elif self.family == 'BB2':
-            u_ = np.exp(param[0] * (u ** (-param[1]) - 1))
-            v_ = np.exp(param[0] * (v ** (-param[1]) - 1))
-            return (1 + (1 / param[0]) * np.log(u_ + v_ - 1)) ** (-1 / param[1])
-
+            delta = param[1]
+            return bb2_copula(u, v, theta, delta)
 
     def get_pdf(self, u, v, param):
         """
@@ -332,17 +393,29 @@ class archimedean(copula):
             term2 = (x + y) ** (1 / delta - 2)
             term3 = theta * (delta - 1) + (theta * delta + 1) * (x + y) ** (1 / delta)
             term4 = (x * y) ** (1 - 1 / delta) * (u * v) ** (-theta - 1)
-            return term1 * term2 * term3 * term4
+            pdf = term1 * term2 * term3 * term4
+            if not np.isfinite(pdf):
+                pdf = grad(grad(bb1_copula, argnums=0), argnums=1)(u, v, theta, delta)
+            return pdf
 
         elif self.family == 'BB2':
-            theta, delta = param[0], param[1]
-            x = np.exp(delta * (u ** (-theta) )) - 1
-            y = np.exp(delta * (v ** (-theta) )) - 1
-            term1 = (1 + (delta ** (-1)) * np.log(x + y - 1)) ** (-2 -1 / theta)
-            term2 = (x + y - 1) ** (-2)
-            term3 = 1 + theta + theta * delta + theta * np.log(x + y - 1)
-            term4 = x * y * (u * v) ** (-theta - 1)
-            return term1 * term2 * term3 * term4
+            p0, p1 = param
+
+            x = p0/u**p1
+            y = p0/v**p1
+
+            logt = scsp.logsumexp([p0, x, y], 0, [-1, 1, 1]) - p0  #  log(-exp(p0) + exp(x) + exp(y)) - p0
+
+            expp = np.exp(p0)
+            expx = np.exp(-x)
+            expy = np.exp(-y)
+
+            pdf = p0**2*u**(-p1 - 1)*v**(-p1 - 1)*(p1*(p0 + logt) + p1 + 1)*(expx*expy)/(((p0 + logt)/p0)**(1/p1)*(p0 + logt)**2*(-(expp*expx*expy) + (expx) + (expy))**2)
+
+            if not np.isfinite(pdf):
+                pdf = grad(grad(bb2_copula_jax, argnums=0), argnums=1)(u, v, p0, p1)
+
+            return pdf
 
     def LTDC(self, theta):
         """
