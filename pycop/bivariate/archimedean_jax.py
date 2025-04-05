@@ -1,0 +1,463 @@
+import numpy as np
+from pycop.bivariate.copula import copula
+import jax
+import jax.numpy as jnp
+import jax.scipy.special as jscsp
+
+import numpy as jnp
+import scipy.special as scsp
+
+from jax import grad
+from jax import config
+config.update("jax_enable_x64", True)
+
+# Clayton Copula
+def clayton_copula_jax(u, v, theta):
+    return (u**(-theta) + v**(-theta) - 1)**(-1/theta)
+
+# Gumbel Copula
+def gumbel_copula_jax(u, v, theta):
+    return jnp.exp(-((-jnp.log(u))**theta + (-jnp.log(v))**theta)**(1/theta))
+
+# Frank Copula
+def frank_copula_jax(u, v, theta):
+    num = (jnp.exp(-theta * u) - 1) * (jnp.exp(-theta * v) - 1)
+    denom = jnp.exp(-theta) - 1
+    return -jnp.log(1 + num / denom) / theta
+
+# Joe Copula
+def joe_copula_jax(u, v, theta):
+    x = (1 - u)**theta
+    y = (1 - v)**theta
+    return 1 - (x + y - x*y)**(1/theta)
+
+# Galambos Copula
+def galambos_copula_jax(u, v, theta):
+    return jnp.exp(-(((-jnp.log(u))**(-theta) + (-jnp.log(v))**(-theta))**(-1/theta)))
+
+# FGM Copula
+def fgm_copula_jax(u, v, theta):
+    return u * v * (1 + theta * (1 - u) * (1 - v))
+
+# Plackett Copula
+def plackett_copula_jax(u, v, theta):
+    eta = theta - 1
+
+    if jnp.isclose(theta, 1.0):  # use Taylor-expansion for theta close to one
+        return u*v + eta*u*v*(1 - u)*(1 - v)
+
+    eta = theta - 1
+    upv = u + v
+    num = 1 + eta * upv - jnp.sqrt((1 + eta * upv)**2 - 4 * u * v * theta * eta)
+    denom = 2 * eta
+
+    return num / denom
+
+# BB1 Copula
+def bb1_copula_jax(u, v, theta, delta):
+    return (1 + ((u**(-theta) - 1)**delta + (v**(-theta) - 1)**delta)**(1/delta))**(-1/theta)
+
+# BB2 Copula
+def bb2_copula_jax(u, v, theta, delta):
+    x = theta*(u**(-delta) - 1)
+    y = theta*(v**(-delta) - 1)
+    logt = jscsp.logsumexp(jnp.array([x, y, 0.0]), 0, jnp.array([1.0, 1.0, -1.0]))
+    return (1 + (1/theta)*logt)**(-1/delta)
+
+# Clayton Copula
+def clayton_copula_np(u, v, theta):
+    return (u**(-theta) + v**(-theta) - 1)**(-1/theta)
+
+# Gumbel Copula
+def gumbel_copula_np(u, v, theta):
+    return np.exp(-((-np.log(u))**theta + (-np.log(v))**theta)**(1/theta))
+
+# Frank Copula
+def frank_copula_np(u, v, theta):
+    num = (np.exp(-theta * u) - 1) * (np.exp(-theta * v) - 1)
+    denom = np.exp(-theta) - 1
+    return -np.log(1 + num / denom) / theta
+
+# Joe Copula
+def joe_copula_np(u, v, theta):
+    x = (1 - u)**theta
+    y = (1 - v)**theta
+    return 1 - (x + y - x*y)**(1/theta)
+
+# Galambos Copula
+def galambos_copula_np(u, v, theta):
+    return np.exp(-(((-np.log(u))**(-theta) + (-np.log(v))**(-theta))**(-1/theta)))
+
+# FGM Copula
+def fgm_copula_np(u, v, theta):
+    return u * v * (1 + theta * (1 - u) * (1 - v))
+
+# Plackett Copula
+def plackett_copula_np(u, v, theta):
+    eta = theta - 1
+
+    if np.isclose(theta, 1.0):  # use Taylor-expansion for theta close to one
+        return u*v + eta*u*v*(1 - u)*(1 - v)
+
+    eta = theta - 1
+    upv = u + v
+    num = 1 + eta * upv - np.sqrt((1 + eta * upv)**2 - 4 * u * v * theta * eta)
+    denom = 2 * eta
+
+    return num / denom
+
+# BB1 Copula
+def bb1_copula_np(u, v, theta, delta):
+    return (1 + ((u**(-theta) - 1)**delta + (v**(-theta) - 1)**delta)**(1/delta))**(-1/theta)
+
+# BB2 Copula
+def bb2_copula_np(u, v, theta, delta):
+    x = theta*(u**(-delta) - 1)
+    y = theta*(v**(-delta) - 1)
+    logt = scsp.logsumexp(np.array([x, y, 0.0]), 0, np.array([1.0, 1.0, -1.0]))
+    return (1 + (1/theta)*logt)**(-1/delta)
+
+class archimedean(copula):
+    """
+    # Creates an Archimedean copula objects
+    Source for the CDF and PDF functions:
+    Joe, H. (2014). Dependence modeling with copulas. CRC press.
+    Chapter 4: Parametric copula families and properties (p.159)
+
+    ...
+
+    Attributes
+    ----------
+    family : str
+        The name of the Archimedean copula function.
+    type : str
+        The type of copula = "archimedean".
+    bounds_param : list
+        A list that contains the domain of the parameter(s) in a tuple.
+        Exemple : [(lower, upper)]
+    parameters_start : array
+        Value(s) of the initial guess when estimating the copula parameter(s).
+        It represents the parameter `x0` in the `scipy.optimize.minimize` function.
+
+    Methods
+    -------
+    get_cdf(u, v, param)
+        Computes the Cumulative Distribution Function (CDF).
+    get_pdf(u, v, param)
+        Computes the Probability Density Function (PDF).
+    LTDC(theta)
+        Computes the Lower Tail Dependence Coefficient (TDC).
+    UTDC(theta)
+        Computes the upper TDC.
+    """
+
+    Archimedean_families = [
+        'clayton', 'gumbel', 'frank', 'joe', 'galambos','fgm', 'plackett',
+        'rgumbel', 'rclayton', 'rjoe','rgalambos', 'BB1', 'BB2']
+
+
+    def __init__(self, family):
+        """
+        Parameters
+        ----------
+        family : str
+            The name of the Archimedean copula function.
+
+        Raises
+        ------
+        ValueError
+            If the given `family` is not supported.
+        """
+
+        # the `archimedean` copula class inherit the `copula` class
+        super().__init__()
+        self.family = family
+        self.type = "archimedean"
+
+        if family  in ['clayton', 'galambos', 'plackett', 'rclayton', 'rgalambos'] :
+            self.bounds_param = [(1e-6, None)]
+            self.parameters_start = np.array(0.5)
+
+        elif family in ['gumbel', 'joe', 'rgumbel', 'rjoe'] :
+            self.bounds_param = [(1.0, None)]
+            self.parameters_start = np.array(1.5)
+
+        elif family == 'frank':
+            self.bounds_param = [(None, None)]
+            self.parameters_start = np.array(2.0)
+
+        elif family == 'fgm':
+            self.bounds_param = [(-1.0, 1.0 - 1e-6)]
+            self.parameters_start = np.array(0.0)
+
+        elif family  in ['BB1'] :
+            self.bounds_param = [(1e-6, None), (1.0, None)]
+            self.parameters_start = (np.array(0.5), np.array(1.5))
+
+        elif family  in ['BB2'] :
+            self.bounds_param = [(1e-6, None), (1e-6, None)]
+            self.parameters_start = (np.array(1.0), np.array(1.0))
+        else:
+            print("family \"%s\" not in list: %s" % (family, archimedean.Archimedean_families) )
+            raise ValueError
+
+    def get_grad_cdf(self, u, v, param):
+        """
+        # Computes the gradient of the CDF with respect to u and v
+
+        Parameters
+        ----------
+        u, v : float
+            Values of the marginal CDFs
+        param : list
+            A list that contains the copula parameter(s) (float)
+        """
+
+        p0 = param[0]
+
+        if self.family == 'clayton':
+            t1 = (-1 + v**(-p0) + u**(-p0))
+            return (1/(u*u**p0*t1*t1**(1/p0)),
+                    1/(v*v**p0*t1*t1**(1/p0)))
+
+        elif self.family == 'rclayton':
+            return tuple(1 - x for x in archimedean(family='clayton').get_grad_cdf((1 - u),(1 - v), param))
+
+        elif self.family == 'gumbel':
+            logu, logv = np.log(u), np.log(v)
+            mlogup, mlogvp = (-logu)**p0, (-logv)**p0
+            mlupv = (mlogup + mlogvp)
+            t1 = mlupv**(1/p0)*np.exp(-mlupv**(1/p0))
+            return (-mlogup*t1/(u*mlupv*logu)
+                    -mlogvp*t1/(v*mlupv*logv))
+
+        elif self.family == 'rgumbel':
+            return tuple(1 - x for x in archimedean(family='gumbel').get_grad_cdf((1 - u),(1 - v), param))
+
+        elif self.family == 'frank':
+            expu, expv, expp = np.exp(-p0*u), np.exp(-p0*v), np.exp(-p0)
+            t1 = ((-1 + expp)*(1 + (-1 + expu)*(-1 + expv)/(-1 + expp)))
+            return ((-1 + expv)*expu/t1
+                    (-1 + expu)*expv/t1)
+
+        elif self.family == 'joe':
+            u_ = (1 - u) ** p0
+            v_ = (1 - v) ** p0
+            t1 = (-u_*v_ + u_ + v_)**((1 - p0)/p0)
+            return ((1 - u)**(p0 - 1)*(1 - v_)*t1
+                    (1 - v)**(p0 - 1)*(1 - u_)*t1)
+
+        elif self.family == 'rjoe':
+            return tuple(1 - x for x in archimedean(family='joe').get_grad_cdf((1 - u),(1 - v), param))
+
+        elif self.family == 'galambos':
+            logu, logv = np.log(u), np.log(v)
+            mlogup, mlogvp = (-logu)**p0, (-logv)**p0
+            mlupv = (mlogup + mlogvp)
+            x_ = (mlupv/(mlogup*mlogvp))**(1/p0)
+            t1 = np.exp((x_)**(-1/p0))
+
+            return (v*(mlogvp + x_*mlupv*logu)*t1/(x_*mlupv*logu),
+                    u*(mlogup + x_*mlupv*logv)*t1/(x_*mlupv*logv))
+
+        elif self.family == 'rgalambos':
+            return tuple(1 - x for x in archimedean(family='galambos').get_grad_cdf((1 - u),(1 - v), param))
+
+        elif self.family == 'fgm':
+            um1, vm1 = (u - 1), (v - 1)
+
+            return (v*(p0*u*vm1 + p0*um1*vm1 + 1),
+                    u*(p0*v*um1 + p0*um1*vm1 + 1))
+
+        elif self.family == 'plackett':
+            eta = p0 - 1
+            upv = (u + v)
+            t1 = (-4*p0*u*v*eta + (eta*upv + 1)**2)**0.5
+
+            return ((1.0*p0*v - 0.5*eta*upv + 0.5*t1 - 0.5)/t1,
+                    (1.0*p0*u - 0.5*eta*upv + 0.5*t1 - 0.5)/t1)
+
+        elif self.family == 'BB1':
+            p1 = param[1]
+            up1 = u**p1
+            vp1 = v**p1
+            c1 = (up1 - 1)
+            c2 = (vp1 - 1)
+            t1 = (-c1/up1)**p0
+            t2 = (-c2/vp1)**p0
+            s1 = (t1 + t2 + 1)
+            s2 = s1*(s1**(1/p0))**(1/p1)
+            return (-t1/(u*c1*s2), -t2/(v*c2*s2))
+
+        elif self.family == 'BB2':
+            p1 = param[1]
+            up1 = u**p1
+            vp1 = v**p1
+            expu, expv, expp, expm = np.exp(p0/up1), np.exp(p0/vp1), np.exp(p0), np.exp(-p0)
+            expu1, expv1 = np.exp(p0*(up1 - 1)/up1), np.exp(p0*(vp1 - 1)/vp1)
+            p0log = (p0 + np.log((-expp + expu + expv)*expm))
+            exp0 = np.exp(p0*((vp1 - 1)/vp1 + (up1 - 1)/up1))
+
+            t1 = ((p0log/p0)**(1/p1)*p0log*(-exp0 + expu1 + expv1))
+
+            return (p0*u**(-p1 - 1)*expv1/t1,
+                    p0*v**(-p1 - 1)*expu1/t1)
+
+    def get_cdf(self, u, v, param):
+        """
+        # Computes the CDF
+
+        Parameters
+        ----------
+        u, v : float
+            Values of the marginal CDFs
+        param : list
+            A list that contains the copula parameter(s) (float)
+        """
+
+        if u == 0.0 or v == 0.0:
+            return 0.0
+
+        if u == 1.0 and v == 1.0:
+            return 1.0
+
+        theta = param[0]
+
+        if self.family == 'clayton':
+            return clayton_copula_np(u, v, theta)
+
+        elif self.family == 'rclayton':
+            return u + v - 1 + archimedean(family='clayton').get_cdf(1 - u, 1 - v, param)
+
+        elif self.family == 'gumbel':
+            return gumbel_copula_np(u, v, theta)
+
+        elif self.family == 'rgumbel':
+            return u + v - 1 + archimedean(family='gumbel').get_cdf(1 - u, 1 - v, param)
+
+        elif self.family == 'frank':
+            return frank_copula_np(u, v, theta)
+
+        elif self.family == 'joe':
+            return joe_copula_np(u, v, theta)
+
+        elif self.family == 'rjoe':
+            return u + v - 1 + archimedean(family='joe').get_cdf(1 - u, 1 - v, param)
+
+        elif self.family == 'galambos':
+            return galambos_copula_np(u, v, theta)
+
+        elif self.family == 'rgalambos':
+            return u + v - 1 + archimedean(family='galambos').get_cdf(1 - u, 1 - v, param)
+
+        elif self.family == 'fgm':
+            return fgm_copula_np(u, v, theta)
+
+        elif self.family == 'plackett':
+            return plackett_copula_np(u, v, theta)
+
+        elif self.family == 'BB1':
+            delta = param[1]
+            return bb1_copula_np(u, v, theta, delta)
+
+        elif self.family == 'BB2':
+            delta = param[1]
+            return bb2_copula_np(u, v, theta, delta)
+
+
+    def get_pdf(self, u, v, param):
+        """
+        # Computes the PDF
+
+        Parameters
+        ----------
+        u, v : float
+            Values of the marginal CDFs
+        param : list
+            A list that contains the copula parameter(s) (float)
+        """
+        theta = param[0]
+
+        if self.family == 'clayton':
+            term1 = (theta + 1) * (u * v)**(-(theta + 1))
+            term2 = (u**(-theta) + v**(-theta) - 1)**(-(2*theta + 1)/theta)
+            return term1*term2
+            if u == 0 or v == 0:
+                return 0.0
+            return grad(grad(clayton_copula_jax, argnums=0), argnums=1)(u, v, theta)
+
+        if self.family == 'rclayton':
+            return archimedean(family='clayton').get_pdf(1 - u, 1 - v, param)
+
+        elif self.family == 'gumbel':
+            return grad(grad(gumbel_copula_jax, argnums=0), argnums=1)(u, v, theta)
+
+        if self.family == 'rgumbel':
+            return archimedean(family='gumbel').get_pdf(1 - u, 1 - v, param)
+
+        elif self.family == 'frank':
+            return grad(grad(frank_copula_jax, argnums=0), argnums=1)(u, v, theta)
+
+        elif self.family == 'joe':
+            return grad(grad(joe_copula_jax, argnums=0), argnums=1)(u, v, theta)
+
+        if self.family == 'rjoe':
+            return archimedean(family='joe').get_pdf(1 - u, 1 - v, param)
+
+        elif self.family == 'galambos':
+            return grad(grad(galambos_copula_jax, argnums=0), argnums=1)(u, v, theta)
+
+        if self.family == 'rgalambos':
+            return archimedean(family='galambos').get_pdf(1 - u, 1 - v, param)
+
+        elif self.family == 'fgm':
+            return grad(grad(fgm_copula_jax, argnums=0), argnums=1)(u, v, theta)
+
+        elif self.family == 'plackett':
+            return grad(grad(plackett_copula_jax, argnums=0), argnums=1)(u, v, theta)
+
+        elif self.family == 'BB1':
+            delta = param[1]
+            return grad(grad(bb1_copula_jax, argnums=0), argnums=1)(u, v, theta, delta)
+
+        elif self.family == 'BB2':
+            delta = param[1]
+            return grad(grad(bb2_copula_jax, argnums=0), argnums=1)(u, v, theta, delta)
+
+    def LTDC(self, theta):
+        """
+        # Computes the lower TDC for a given theta
+
+        Parameters
+        ----------
+        theta : float
+            The copula parameter
+        """
+
+        if self.family  in ['gumbel', 'joe', 'frank', 'galambos', 'fgm', 'plackett', 'rclayton']:
+            return 0
+
+        elif self.family  in ['rgalambos', 'clayton'] :
+            return 2 ** (-1 / theta)
+
+        elif self.family  in ['rgumbel', 'rjoe'] :
+            return 2 - 2 ** (1 / theta)
+
+    def UTDC(self, theta):
+        """
+        # Computes the upper TDC for a given theta
+
+        Parameters
+        ----------
+        theta : float
+            The copula parameter
+        """
+
+        if self.family  in ['clayton', 'frank', 'fgm', 'plackett', 'rgumbel', 'rjoe', 'rgalambos']:
+            return 0
+
+        elif self.family  in ['galambos', 'rclayton'] :
+            return 2 ** (-1 / theta)
+
+        elif self.family  in ['gumbel', 'joe'] :
+            return 2 - 2 ** (1 / theta)
