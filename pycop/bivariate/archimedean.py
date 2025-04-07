@@ -1,11 +1,6 @@
 import numpy as np
 import scipy.special as scsp
 from pycop.bivariate.copula import copula
-# import jax.numpy as jnp
-# import jax.scipy.special as jscsp
-# from jax import grad
-# from jax import config
-# config.update("jax_enable_x64", True)
 
 # Clayton Copula
 def clayton_copula(u, v, theta):
@@ -29,7 +24,7 @@ def joe_copula(u, v, theta):
 
 # Galambos Copula
 def galambos_copula(u, v, theta):
-    return u*v*np.exp(-(((-np.log(u))**(-theta) + (-np.log(v))**(-theta))**(-1/theta)))
+    return u*v*np.exp(((-np.log(u))**(-theta) + (-np.log(v))**(-theta))**(-1/theta))
 
 # FGM Copula
 def fgm_copula(u, v, theta):
@@ -42,7 +37,6 @@ def plackett_copula(u, v, theta):
     if np.isclose(theta, 1.0):  # use Taylor-expansion for theta close to one
         return u*v + eta*u*v*(1 - u)*(1 - v)
 
-    eta = theta - 1
     upv = u + v
     num = 1 + eta * upv - np.sqrt((1 + eta * upv)**2 - 4 * u * v * theta * eta)
     denom = 2 * eta
@@ -164,7 +158,7 @@ class archimedean(copula):
                     1/(v*v**p0*t1*t1**(1/p0)))
 
         elif self.family == 'rclayton':
-            return tuple(1 - x for x in archimedean(family='clayton').get_grad_cdf((1 - u),(1 - v), param))
+            return tuple(1 - x for x in archimedean(family='clayton').get_grad_cdf(1 - u, 1 - v, param))
 
         elif self.family == 'gumbel':
             logu, logv = np.log(u), np.log(v)
@@ -175,7 +169,7 @@ class archimedean(copula):
                     -mlogvp*t1/(v*mlupv*logv))
 
         elif self.family == 'rgumbel':
-            return tuple(1 - x for x in archimedean(family='gumbel').get_grad_cdf((1 - u),(1 - v), param))
+            return tuple(1 - x for x in archimedean(family='gumbel').get_grad_cdf(1 - u, 1 - v, param))
 
         elif self.family == 'frank':
             expu, expv, expp = np.exp(-p0*u), np.exp(-p0*v), np.exp(-p0)
@@ -191,7 +185,7 @@ class archimedean(copula):
                     (1 - v)**(p0 - 1)*(1 - u_)*t1)
 
         elif self.family == 'rjoe':
-            return tuple(1 - x for x in archimedean(family='joe').get_grad_cdf((1 - u),(1 - v), param))
+            return tuple(1 - x for x in archimedean(family='joe').get_grad_cdf(1 - u, 1 - v, param))
 
         elif self.family == 'galambos':
             U = -np.log(u)
@@ -200,14 +194,15 @@ class archimedean(copula):
             Vp = V**p0
             UpV = Up + Vp
             A = (UpV/(Up*Vp))**(1/p0)
-            expA = np.exp(-1/A)
-            cdf_u = v*(1 + Vp/(A*U*UpV))*expA
-            cdf_v = u*(1 + Up/(A*V*UpV))*expA
+            expA = np.exp(1/A)
+
+            cdf_u = v*(1 - Vp/(A*U*UpV))*expA
+            cdf_v = u*(1 - Up/(A*V*UpV))*expA
 
             return cdf_u, cdf_v
 
         elif self.family == 'rgalambos':
-            return tuple(1 - x for x in archimedean(family='galambos').get_grad_cdf((1 - u),(1 - v), param))
+            return tuple(1 - x for x in archimedean(family='galambos').get_grad_cdf(1 - u, 1 - v, param))
 
         elif self.family == 'fgm':
             um1, vm1 = (u - 1), (v - 1)
@@ -351,7 +346,7 @@ class archimedean(copula):
             return term1 * term2
 
         if self.family == 'rclayton':
-            return archimedean(family='clayton').get_pdf((1 - u),(1 - v), param)
+            return archimedean(family='clayton').get_pdf(1 - u, 1 - v, param)
 
         elif self.family == 'gumbel':
             term1 = np.power(np.multiply(u, v), -1)
@@ -382,7 +377,7 @@ class archimedean(copula):
             return Upm*Vpm*A**(-2 + 1/p0)*(A + p0 - 1)
 
         if self.family == 'rjoe':
-            return archimedean(family='joe').get_pdf((1 - u),(1 - v), param)
+            return archimedean(family='joe').get_pdf(1 - u, 1 - v, param)
 
         elif self.family == 'galambos':
             U = -np.log(u)
@@ -391,11 +386,12 @@ class archimedean(copula):
             Vp = V**p0
             UpV = Up + Vp
             A = (UpV/(Up*Vp))**(1/p0)
-            pdf = (1 + Up/(A*V*UpV) - Up*Vp*(p0 + 1)/(A*U*V*UpV**2) + Vp/(A*U*UpV) + Up*Vp/(UpV**2*V*U*A**2))*np.exp(-1/A)
+            expA = np.exp(1/A)
+            pdf = (1 - Up/(A*UpV*V) + Up*Vp*(p0 + 1)/(A*U*V*UpV**2) - Vp/(A*U*UpV) + Up*Vp/(A**2*UpV**2*U*V))*expA
             return pdf
 
         if self.family == 'rgalambos':
-            return archimedean(family='galambos').get_pdf((1 - u),(1 - v), param)
+            return archimedean(family='galambos').get_pdf(1 - u, 1 - v, param)
 
         elif self.family == 'fgm':
             return 1 + param[0] * (1 - 2 * u) * (1 - 2 * v)
