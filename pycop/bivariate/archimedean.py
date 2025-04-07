@@ -51,8 +51,18 @@ def bb1_copula(u, v, theta, delta):
 def bb2_copula(u, v, theta, delta):
     x = theta*(u**(-delta) - 1)
     y = theta*(v**(-delta) - 1)
-    logt = scsp.logsumexp(np.array([x, y, 0.0]), 0, np.array([1.0, 1.0, -1.0]))
+    logt = logsumexp([x, y, 0.0], [1.0, 1.0, -1.0])
     return (1 + (1/theta)*logt)**(-1/delta)
+
+def logsumexp(a, b):
+    a = np.stack(np.broadcast_arrays(*a))
+    b = np.asarray(b)
+    if a.ndim == 2:
+        b = b[:, np.newaxis]
+    elif a.ndim == 3:
+        b = b[:, np.newaxis, np.newaxis]
+
+    return scsp.logsumexp(a, 0, b)
 
 class archimedean(copula):
     """
@@ -250,7 +260,7 @@ class archimedean(copula):
             exp_xmy = np.exp(x - y)
             exp_pmx = np.exp(p0 - x)
             exp_pmy = np.exp(p0 - y)
-            logs = scsp.logsumexp([x, y, p0], 0, [1, 1, -1])
+            logs = logsumexp([x, y, p0], [1, 1, -1])
 
             A = logs*(logs/p0)**(1/p1)
 
@@ -426,7 +436,7 @@ class archimedean(copula):
             x = p0/u**p1
             y = p0/v**p1
 
-            logs = scsp.logsumexp([x, y, p0], 0, [1, 1, -1])
+            logs = logsumexp([x, y, p0], [1, 1, -1])
 
             sxy = np.exp(p0 - 0.5*x - 0.5*y)
             s_xdy = np.exp(0.5*x - 0.5*y)
