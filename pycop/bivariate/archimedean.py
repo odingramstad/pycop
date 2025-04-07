@@ -271,54 +271,63 @@ class archimedean(copula):
             A list that contains the copula parameter(s) (float)
         """
 
-        if u == 0.0 or v == 0.0:
-            return 0.0
+        u, v = np.broadcast_arrays(u, v)
+        cdf = -np.ones(np.broadcast_shapes(u, v))
 
-        if u == 1.0 and v == 1.0:
-            return 1.0
+        cdf[(u == 0.0)|(v == 0.0)] = 0.0
+        cdf[(u == 1.0)&(v == 1.0)] = 1.0
+
+        ind = np.nonzero(cdf < 0.0)
+
+        u = u[ind]
+        v = v[ind]
 
         theta = param[0]
 
         if self.family == 'clayton':
-            return clayton_copula(u, v, theta)
+            cdf[ind] = clayton_copula(u, v, theta)
 
         elif self.family == 'rclayton':
-            return u + v - 1 + archimedean(family='clayton').get_cdf(1 - u, 1 - v, param)
+            cdf[ind] = u + v - 1 + archimedean(family='clayton').get_cdf(1 - u, 1 - v, param)
 
         elif self.family == 'gumbel':
-            return gumbel_copula(u, v, theta)
+            cdf[ind] = gumbel_copula(u, v, theta)
 
         elif self.family == 'rgumbel':
-            return u + v - 1 + archimedean(family='gumbel').get_cdf(1 - u, 1 - v, param)
+            cdf[ind] = u + v - 1 + archimedean(family='gumbel').get_cdf(1 - u, 1 - v, param)
 
         elif self.family == 'frank':
-            return frank_copula(u, v, theta)
+            cdf[ind] = frank_copula(u, v, theta)
 
         elif self.family == 'joe':
-            return joe_copula(u, v, theta)
+            cdf[ind] = joe_copula(u, v, theta)
 
         elif self.family == 'rjoe':
-            return u + v - 1 + archimedean(family='joe').get_cdf(1 - u, 1 - v, param)
+            cdf[ind] = u + v - 1 + archimedean(family='joe').get_cdf(1 - u, 1 - v, param)
 
         elif self.family == 'galambos':
-            return galambos_copula(u, v, theta)
+            cdf[ind] = galambos_copula(u, v, theta)
 
         elif self.family == 'rgalambos':
-            return u + v - 1 + archimedean(family='galambos').get_cdf(1 - u, 1 - v, param)
+            cdf[ind] = u + v - 1 + archimedean(family='galambos').get_cdf(1 - u, 1 - v, param)
 
         elif self.family == 'fgm':
-            return fgm_copula(u, v, theta)
+            cdf[ind] = fgm_copula(u, v, theta)
 
         elif self.family == 'plackett':
-            return plackett_copula(u, v, theta)
+            cdf[ind] = plackett_copula(u, v, theta)
 
         elif self.family == 'BB1':
             delta = param[1]
-            return bb1_copula(u, v, theta, delta)
+            cdf[ind] = bb1_copula(u, v, theta, delta)
 
         elif self.family == 'BB2':
             delta = param[1]
-            return bb2_copula(u, v, theta, delta)
+            cdf[ind] = bb2_copula(u, v, theta, delta)
+
+        if cdf.size == 1:
+            return cdf.item()
+        return cdf
 
     def get_pdf(self, u, v, param):
         """
