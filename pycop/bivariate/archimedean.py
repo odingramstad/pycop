@@ -332,6 +332,7 @@ class archimedean(copula):
             A list that contains the copula parameter(s) (float)
         """
 
+        p0 = param[0]
         if self.family == 'clayton':
             term1 = (param[0] + 1) * (u * v) ** (-param[0] - 1)
             term2 = (u ** (-param[0]) + v ** (-param[0]) - 1) ** (-2 - 1 / param[0])
@@ -358,12 +359,15 @@ class archimedean(copula):
             return term1 / term2
 
         elif self.family == 'joe':
-            u_ = (1 - u) ** param[0]
-            v_ = (1 - v) ** param[0]
-            term1 = (u_ + v_ - u_ * v_) ** (-2 + 1 / param[0])
-            term2 = ((1 - u) ** (param[0] - 1)) * ((1 - v) ** (param[0] - 1))
-            term3 = param[0] - 1 + u_ + v_ + u_ * v_
-            return term1 * term2 * term3
+            U = 1 - u
+            V = 1 - v
+            Up = U**p0
+            Vp = V**p0
+            Upm = U**(p0 - 1)
+            Vpm = V**(p0 - 1)
+            A = Up + Vp - Up*Vp
+
+            return Upm*Vpm*A**(-2 + 1/p0)*(A + p0 - 1)
 
         if self.family == 'rjoe':
             return archimedean(family='joe').get_pdf((1 - u),(1 - v), param)
