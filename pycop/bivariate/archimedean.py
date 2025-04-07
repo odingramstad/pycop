@@ -221,19 +221,21 @@ class archimedean(copula):
         elif self.family == 'BB1':
             p1 = param[1]
 
-            U = -1 + u**(-p1)
-            V = -1 + v**(-p1)
-            Up = -1 + u**p1
-            Vp = -1 + v**p1
+            U = u**p0
+            V = v**p0
+            x = -1 + 1/U
+            y = -1 + 1/V
+            A = (x**p1 + y**p1)**(1/p1)
+            B = (A + 1)**(1/p0)
 
-            x = U**p0 + V**p0 + 1
+            Fx = 1 + (y/x)**p1
+            Fy = 1 + (x/y)**p1
 
-            A = x**(1/(p0*p1))
-            Bu = Up*u*x
-            Bv = Vp*v*x
+            cdf_u = A/(B*u*(A + 1)*U*x*Fx)
+            cdf_v = A/(B*v*(A + 1)*V*y*Fy)
 
-            cdf_u = -(1/A)*(1/Bu)*(U**p0)
-            cdf_v = -(1/A)*(1/Bv)*(V**p0)
+            # if not np.isfinite(cdf_u):
+            #     print()
 
             return cdf_u, cdf_v
 
@@ -321,7 +323,8 @@ class archimedean(copula):
 
         elif self.family == 'BB2':
             delta = param[1]
-            cdf[ind] = bb2_copula(u, v, theta, delta)
+            bb2_vec = np.vectorize(bb2_copula, excluded=(2, 3))
+            cdf[ind] = bb2_vec(u, v, theta, delta)
 
         if cdf.size == 1:
             return cdf.item()
@@ -406,17 +409,14 @@ class archimedean(copula):
         elif self.family == 'BB1':
             p0, p1 = param[0], param[1]
 
-            U = -1 + u**(-p1)
-            V = -1 + v**(-p1)
-            Up = -1 + u**p1
-            Vp = -1 + v**p1
-            x = U**p0 + V**p0 + 1
+            x = (-1 + u**(-p0))**p1
+            y = (-1 + v**(-p0))**p1
+            xpy = (x + y)**(1/p1)
+            A = (xpy + 1)**(1/p0 + 2)
+            Up = -1 + u**p0
+            Vp = -1 + v**p0
 
-            A = x**(1/(p0*p1))
-            Bu = Up*u*x
-            Bv = Vp*v*x
-
-            pdf = (U**p0)*(V**p0)*(p0*p1 + 1)*(1/A)*(1/Bu)*(1/Bv)
+            pdf = x*y*xpy*(p0*p1*xpy + p0*p1 - p0 + xpy)/(A*Up*Vp*u*v*(x + y)**2)
 
             return pdf
 
