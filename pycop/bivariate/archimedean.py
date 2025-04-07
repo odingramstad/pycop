@@ -333,8 +333,7 @@ class archimedean(copula):
 
         elif self.family == 'BB2':
             delta = param[1]
-            bb2_vec = np.vectorize(bb2_copula, excluded=(2, 3))
-            cdf[ind] = bb2_vec(u, v, theta, delta)
+            cdf[ind] = bb2_copula(u, v, theta, delta)
 
         if cdf.size == 1:
             return cdf.item()
