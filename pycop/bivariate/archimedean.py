@@ -29,7 +29,7 @@ def joe_copula(u, v, theta):
 
 # Galambos Copula
 def galambos_copula(u, v, theta):
-    return np.exp(-(((-np.log(u))**(-theta) + (-np.log(v))**(-theta))**(-1/theta)))
+    return u*v*np.exp(-(((-np.log(u))**(-theta) + (-np.log(v))**(-theta))**(-1/theta)))
 
 # FGM Copula
 def fgm_copula(u, v, theta):
