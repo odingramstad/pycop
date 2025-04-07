@@ -194,14 +194,17 @@ class archimedean(copula):
             return tuple(1 - x for x in archimedean(family='joe').get_grad_cdf((1 - u),(1 - v), param))
 
         elif self.family == 'galambos':
-            logu, logv = np.log(u), np.log(v)
-            mlogup, mlogvp = (-logu)**p0, (-logv)**p0
-            mlupv = (mlogup + mlogvp)
-            x_ = (mlupv/(mlogup*mlogvp))**(1/p0)
-            t1 = np.exp((x_)**(-1/p0))
+            U = -np.log(u)
+            V = -np.log(v)
+            Up = U**p0
+            Vp = V**p0
+            UpV = Up + Vp
+            A = (UpV/(Up*Vp))**(1/p0)
+            expA = np.exp(-1/A)
+            cdf_u = v*(1 + Vp/(A*U*UpV))*expA
+            cdf_v = u*(1 + Up/(A*V*UpV))*expA
 
-            return (v*(mlogvp/(x_*mlupv*logu) + 1)*t1,
-                    u*(mlogup/(x_*mlupv*logv) + 1)*t1)
+            return cdf_u, cdf_v
 
         elif self.family == 'rgalambos':
             return tuple(1 - x for x in archimedean(family='galambos').get_grad_cdf((1 - u),(1 - v), param))
@@ -271,7 +274,7 @@ class archimedean(copula):
             A list that contains the copula parameter(s) (float)
         """
 
-        u, v = np.broadcast_arrays(u, v)
+        u, v = np.broadcast_arrays(np.atleast_1d(u), np.atleast_1d(v))
         cdf = -np.ones(u.shape)
 
         cdf[(u == 0.0)|(v == 0.0)] = 0.0
@@ -382,15 +385,14 @@ class archimedean(copula):
             return archimedean(family='joe').get_pdf((1 - u),(1 - v), param)
 
         elif self.family == 'galambos':
-            x = -np.log(u)
-            y = -np.log(v)
-            term1 = self.get_cdf(u, v, param) / (v * u)
-            term2 = 1 - ((x ** (-param[0]) + y ** (-param[0])) ** (-1 - 1 / param[0])) \
-                    * (x ** (-param[0] - 1) + y ** (-param[0] - 1))
-            term3 = ((x ** (-param[0]) + y ** (-param[0])) ** (-2 - 1 / param[0])) \
-                    * ((x * y) ** (-param[0] - 1))
-            term4 = 1 + param[0] + ((x ** (-param[0]) + y ** (-param[0])) ** (-1 / param[0]))
-            return term1 * term2 + term3 * term4
+            U = -np.log(u)
+            V = -np.log(v)
+            Up = U**p0
+            Vp = V**p0
+            UpV = Up + Vp
+            A = (UpV/(Up*Vp))**(1/p0)
+            pdf = (1 + Up/(A*V*UpV) - Up*Vp*(p0 + 1)/(A*U*V*UpV**2) + Vp/(A*U*UpV) + Up*Vp/(UpV**2*V*U*A**2))*np.exp(-1/A)
+            return pdf
 
         if self.family == 'rgalambos':
             return archimedean(family='galambos').get_pdf((1 - u),(1 - v), param)
