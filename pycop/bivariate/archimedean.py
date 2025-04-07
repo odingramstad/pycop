@@ -272,7 +272,7 @@ class archimedean(copula):
         """
 
         u, v = np.broadcast_arrays(u, v)
-        cdf = -np.ones(np.broadcast_shapes(u, v))
+        cdf = -np.ones(u.shape)
 
         cdf[(u == 0.0)|(v == 0.0)] = 0.0
         cdf[(u == 1.0)&(v == 1.0)] = 1.0
