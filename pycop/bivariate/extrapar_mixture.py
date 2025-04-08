@@ -74,7 +74,7 @@ class extrapar_mixture(copula):
         for cop in copula_list[1:]:
             mixture_type+= "-"+cop.capitalize()
 
-        self.family = mixture_type + " mixture"
+        self.family = mixture_type + " extrapar_mixture"
         self.bounds_param = [(0, 1), (0, 1)]
         self.parameters_start = [np.array(0.5), np.array(0.5)]
 
@@ -90,7 +90,7 @@ class extrapar_mixture(copula):
                 self.bounds_param.append(cop_mixt.bounds_param[0])
                 self.parameters_start.append(cop_mixt.parameters_start)
             else:
-                print("Mixture only supported for archimedean and gaussian mixture only")
+                print("Extrapar mixture only supported for archimedean and gaussian mixture only")
                 print("Archimedean copula available are: ", Archimedean_families)
                 raise ValueError
         self.parameters_start = tuple(self.parameters_start)
@@ -106,30 +106,17 @@ class extrapar_mixture(copula):
         param : list
             A list that contains the parameters of the mixture and the copula.
             The element of the list must be ordered as follow, for 2-dimensional mixture :
-                [
-                    weight1 : float, weight1 ∈ [-1,1]
-                        The weight given in the first copula.
+                [   alpha: float, ∈ [0,1]
+                    beta: float, ∈ [0,1]
                     theta1 : float
                         The theta parameter of the first copula.
+                    delta1 : float
+                        The delta parameter of the first copula (for BB1 and BB2).
                     theta2 : float
-                        " second.
+                        The theta parameter of the second copula.
+                    delta2 : float
+                        The delta parameter of the second copula (for BB1 and BB2).
                 ]
-            For a 3-dimensional mixture :
-                [
-                    weight1 : float
-                        the weight given in the first copula.
-                    weight2 : float
-                        " second.
-                    weight3 : float
-                        " third.
-                    theta1 : float
-                        The theta parameter of the first copula.
-                    theta2 : float
-                        " second.
-                    theta3 : float
-                        " third.
-                ]
-            The sum of the weights must be equal to 1.
         """
         a, b = param[:2]
 
@@ -195,7 +182,8 @@ class extrapar_mixture(copula):
         theta : float
             The parameter of the copula with Lower Tail Dependence
         """
-        return self.cop[0].LTDC(theta)*weight
+        raise NotImplementedError()
+        # return self.cop[0].LTDC(theta)*weight
 
     def UTDC(self, theta, weight):
         """
@@ -208,4 +196,5 @@ class extrapar_mixture(copula):
         theta : float
             The parameter of the copula with Upper Tail Dependence
         """
-        return self.cop[-1].UTDC(theta)*weight
+        raise NotImplementedError()
+        # return self.cop[-1].UTDC(theta)*weight
