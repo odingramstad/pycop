@@ -5,4 +5,5 @@ from pycop.bivariate.empirical import empirical
 from pycop.bivariate.gaussian import gaussian
 from pycop.bivariate.student import student
 from pycop.bivariate.mixture import mixture
+from pycop.bivariate.extrapar_mixture import extrapar_mixture
 from pycop.bivariate import estimation
